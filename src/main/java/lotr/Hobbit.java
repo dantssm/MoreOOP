@@ -11,10 +11,5 @@ public class Hobbit extends Character {
     public void toCry() {
         System.out.println("Hobbit is crying");
     }
-
-    @Override
-    public String toString() {
-        return "Hobbit{hp=" + hp + ", power=" + power + "}";
-    }
     
 }

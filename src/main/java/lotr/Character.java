@@ -1,7 +1,7 @@
 package lotr;
-public class Character {
-    public int power;
-    public int hp;
+public abstract class Character {
+    protected int power;
+    protected int hp;
 
     public Character(int power, int hp) {
         this.power = power;
@@ -13,7 +13,7 @@ public class Character {
     }
 
     public void setPower(int power) {
-        this.power = power;
+        this.power = Math.max(power, 0);
     }
 
     public int getHp() {
@@ -21,17 +21,16 @@ public class Character {
     }
 
     public void setHp(int hp) {
-        if (hp >= 0) {this.hp = hp;} 
-        else {this.hp = 0;}
+        this.hp = Math.max(hp, 0);
     }
 
     public String toString() {
-        return "Character{hp=" + hp + ", power=" + power + "}";
+        return getClass().getSimpleName() + "{hp=" + hp + ", power=" + power + "}";
     }
 
-    public void kick(Character c) {}
-    
+    public abstract void kick(Character c);
+
     public boolean isAlive() {
         return hp > 0;
-    } 
+    }
 }

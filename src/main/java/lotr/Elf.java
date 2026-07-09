@@ -12,9 +12,4 @@ public class Elf extends Character {
             c.setHp(c.hp - 1);
         }
     }
-
-    @Override
-    public String toString() {
-        return "Elf{hp=" + hp + ", power=" + power + "}";
-    }
 }
