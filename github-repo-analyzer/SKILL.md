@@ -1,6 +1,6 @@
 ---
 name: github-repo-analyzer
-description: Connect to remote GitHub repositories using the GitHub REST API using locally-stored PAT to list repository contents, inspect directory structures, and read file contents. Use when users ask to explore a GitHub repository without cloning it.
+description: Connect to remote GitHub repositories using the GitHub REST API using locally-stored PAT to list repository contents, inspect directory structures, and read file contents. Use when users ask to explore, browse, or inspect a GitHub repository without cloning it.
 allowed-tools:
   - Bash(curl:*)
 ---
@@ -16,6 +16,13 @@ This skill helps exploring **remote GitHub repositories** through the GitHub RES
 - List repository files
 - Display repository directory trees
 - Read file contents
+
+## Scope
+Only perform the action the user explicitly asked for, and nothing beyond it:
+- "Show structure" / "explore" / "analyze the structure" means Action A (list tree) only. Do not also fetch individual file contents unless asked.
+- Do not generate summary reports, diagrams, design-pattern write-ups, or any other analysis artifacts unless the user explicitly requests them.
+- Print output directly in the response. Do not create scratch scripts, Python helpers, or files to produce this skill's output — `curl` is the only tool this skill needs.
+- If you think a follow-up action would be useful (e.g. reading a specific file after listing the tree), ask the user first instead of doing it.
 
 ## Process
 
@@ -51,7 +58,7 @@ This skill helps exploring **remote GitHub repositories** through the GitHub RES
 * *Trigger:* User asks to show structure, list files, or explore the repo.
 * *API Call:* `GET /repos/{owner}/{repo}/git/trees/{branch}?recursive=1`
 * *Formatting:* Display the directories and files as a readable tree structure in the console. Preserve directory hierarchy and sort directories before files.
-
+* *Stop here.* Do not proceed to Action B unless the user separately asks to read a file.
 **Action B: Read File Contents**
 * *Trigger:* User asks to read, show, or output a specific file.
 * *API Call:* `GET /repos/{owner}/{repo}/contents/{path}?ref={branch}`
