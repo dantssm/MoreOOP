@@ -1,0 +1,30 @@
+{
+  "summary": "MoreOOP is a Java-based combat simulation project inspired by Lord of the Rings characters. It is designed as a laboratory assignment for a university object-oriented programming course to demonstrate inheritance, polymorphism, and dynamic class loading using the Reflections library.",
+  "technologies": [
+    "Java 11",
+    "Maven",
+    "JUnit Jupiter 5.8.1",
+    "org.reflections 0.10.2",
+    "GitHub Actions (CI)"
+  ],
+  "strengths": [
+    "Good use of object-oriented programming principles, specifically inheritance with the Character base class and polymorphism with overridden kick methods.",
+    "Dynamic character instantiation in CharacterFactory using the Reflections library, allowing new character types to be integrated seamlessly without modifying the factory class.",
+    "Automated unit testing with JUnit 5 and basic test coverage for character behaviors.",
+    "Automated CI workflow defined in GitHub Actions to compile code and run tests on push."
+  ],
+  "issues": [
+    "Potential infinite loop in GameManager: if two Hobbits fight, they will loop indefinitely crying without dealing any damage to each other.",
+    "Poor encapsulation: the power and hp fields in the Character base class are public, exposing class internals and bypassing getters and setters.",
+    "Character class could be abstract: the base Character class has an empty kick implementation and can be instantiated directly, which should be avoided.",
+    "Reflections library overhead: scanning the classpath at runtime to locate subclasses of Character is slow and introduces a heavy third-party dependency for a small number of static character types.",
+    "Lack of input validation: while setHp prevents negative HP, there is no validation on setPower to prevent negative values."
+  ],
+  "recommendations": [
+    "Declare the Character class as abstract and make the kick(Character c) method an abstract method.",
+    "Change the visibility of power and hp fields to private or protected and enforce encapsulation.",
+    "Add a maximum turn limit or a state progress check in GameManager.fight to prevent infinite loop scenarios (e.g. Hobbit vs Hobbit).",
+    "Replace runtime classpath scanning in CharacterFactory with a static registration list or a lightweight factory pattern to eliminate the third-party reflections dependency.",
+    "Improve unit test coverage by adding tests for King, Knight, CharacterFactory, and GameManager."
+  ]
+}
