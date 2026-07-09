@@ -1,0 +1,32 @@
+## Summary
+
+This repository is a Java project implementing a mini-game framework featuring characters from 'The Lord of the Rings' using Object-Oriented Programming (OOP) concepts. It features dynamic character instantiation via a reflection-based factory and a GameManager that runs character-vs-character combat simulations.
+
+## Technologies
+
+- Java 11
+- Maven
+- JUnit 5
+- org.reflections
+
+## Strengths
+
+- Dynamic character creation in `lotr/CharacterFactory.java` using the `org.reflections` library, enabling new subclasses to be integrated automatically without modifying factory code.
+- Input validation in `lotr/Character.java` within the `setHp` method, successfully preventing HP from being set to a negative value.
+- Decoupled combat simulation loop in `lotr/GameManager.java` that logs fight progression and results dynamically using character `toString` implementations.
+
+## Issues
+
+- Infinite loop vulnerability in `lotr/GameManager.java` `fight` method; if two `Hobbit` characters fight (or any two characters with 0 power), the loop runs forever since no damage can be dealt.
+- Code duplication in `lotr/King.java` and `lotr/Knight.java`, which have identical `kick` implementations and `randomValue` helper methods.
+- Convention violation in unit test packaging; test classes like `ElfTest.java` and `HobbitTest.java` are placed in the default package instead of package `lotr` under `src/test/java/lotr/`, breaking standard Maven conventions and preventing package-private access testing.
+- Encapsulation breach in `lotr/Character.java` where the `hp` and `power` fields are declared `public`, allowing external classes to modify state directly without using validation logic.
+- Redundant overrides of `toString` in `lotr/Elf.java`, `lotr/Hobbit.java`, `lotr/King.java`, and `lotr/Knight.java`, which could instead be handled dynamically by the base `Character` class.
+
+## Recommendations
+
+- Introduce a maximum round limit or a stalemate check in the `lotr/GameManager.java` `fight` loop to terminate the battle and declare a draw.
+- Create a shared base class or extract the random-damage kicking logic of `lotr/King.java` and `lotr/Knight.java` into a common parent class to eliminate code duplication.
+- Relocate unit tests to `src/test/java/lotr/`, update their package declarations to `package lotr;`, and remove unnecessary imports of classes from the same package.
+- Change the visibility of `hp` and `power` fields in `lotr/Character.java` from `public` to `private` or `protected` to enforce encapsulation.
+- Refactor `lotr/Character.java` to dynamically include the subclass name in `toString` using `this.getClass().getSimpleName()` and remove the redundant overrides in the subclasses.
