@@ -93,7 +93,9 @@ Only perform the action the user explicitly asked for, and nothing beyond it:
 ### Step 5: Handle Potential Errors
 
 * If you receive an error from the API, handle it gracefully:
+    * **502 Bad Gateway / 503 Service Unavailable:** These are transient GitHub-side errors, not a problem with your request. Retry the exact same request once after a short pause. If it fails again, tell the user GitHub's API is temporarily unavailable and suggest trying again shortly — don't reinterpret it as an auth or repo-existence problem.
     * **401 Unauthorized:** Inform the user that the GitHub token is invalid or expired.
     * **403 Forbidden:** Explain that the token lacks permission or GitHub rate limiting has been reached.
     * **404 Not Found:** Explain that the repository, branch, or file could not be found. Check for typos in the user's prompt.
     * **Empty Response:** Explain that no matching files or directories were found.
+* **Debugging tip:** never pipe raw `curl` output into `head` or other truncating commands — this can throw a misleading "Failure writing output" error unrelated to the actual API response. Capture output to a variable first (`resp=$(curl -s ...)`), then inspect it.
