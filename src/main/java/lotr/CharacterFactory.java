@@ -1,5 +1,6 @@
 package lotr;
 
+import java.lang.reflect.Modifier;
 import java.util.Random;
 import java.util.List;
 import java.util.ArrayList;
@@ -10,9 +11,14 @@ public class CharacterFactory {
 
     public CharacterFactory() {
         Reflections reflections = new Reflections("lotr");
-        characterClasses = new ArrayList<>(reflections.getSubTypesOf(Character.class));
+        characterClasses = new ArrayList<>();
+        for (Class<? extends Character> cls : reflections.getSubTypesOf(Character.class)) {
+            if (!Modifier.isAbstract(cls.getModifiers())) {
+                characterClasses.add(cls);
+            }
+        }
     }
-    
+
     public Character createCharacter() {
         Random rand = new Random();
         int randType = rand.nextInt(characterClasses.size());
