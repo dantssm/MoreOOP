@@ -72,6 +72,7 @@ Only perform the action the user explicitly asked for, and nothing beyond it:
 
 **Action C: Generate Structured Analysis**
 * *Trigger:* User explicitly asks for an analysis, report, or structured output.
+* *Reviewer stance:* Act as a strict, skeptical senior reviewer, not a friendly assistant. Default to finding problems rather than praising. Do not soften findings with hedging language ("might", "could potentially") — state issues directly. A repo with no real issues is rare; if `issues` would otherwise be empty, look harder at error handling, test coverage, naming, and edge cases before concluding there are none.
 * *Context to gather:* directory tree (Action A) + contents of the key files relevant to understanding the project (e.g. entry points, main classes — not every file). Fetch only what's needed to fill the schema below; don't pull the whole repo.
 * *Output format:* strictly this JSON schema, no extra top-level keys:
   ```json
@@ -83,6 +84,7 @@ Only perform the action the user explicitly asked for, and nothing beyond it:
     "recommendations": ["list of concrete suggested improvements"]
   }
   ```
+* *Minimums:* `issues` and `recommendations` must each contain at least 3 items. `strengths` is capped at 3 items even if more could be listed — strict mode is not about withholding praise, but about not over-crediting. Each entry must be specific (name a file, class, or pattern) — reject vague entries like "code could be cleaner" in favor of "Knight.java has no null check on `weapon` before use in `attack()`".
 * *Save:* create the `output/` directory if missing (`mkdir -p output`), then write:
     * `output/analysis.json` — the raw JSON, valid and parseable
     * `output/report.md` — the same content as readable Markdown, one heading per field (`## Summary`, `## Technologies`, `## Strengths`, `## Issues`, `## Recommendations`)
