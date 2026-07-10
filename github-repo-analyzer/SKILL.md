@@ -1,8 +1,9 @@
 ---
 name: github-repo-analyzer
-description: Connect to remote GitHub repositories using the GitHub REST API and a locally stored PAT to list repository contents, inspect directory structures, read file contents, generate structured analysis reports, or review a pull request's diff. Use when users ask to explore, browse, inspect, analyze, or review a GitHub repository or pull request without cloning it.
+description: Connect to remote GitHub repositories using the GitHub REST API and a locally stored PAT to list repository contents, inspect directory structures, read file contents, generate structured analysis reports, or review a pull request's diff. Use when users ask to explore, browse, inspect, or analyze a GitHub repository or pull request without cloning it.
 allowed-tools:
   - Bash(curl:*)
+  - Bash(jq:*)
   - Bash(mkdir:*)
   - Write
 ---
@@ -11,7 +12,13 @@ allowed-tools:
 
 ## Overview
 
-This skill helps explore **remote GitHub repositories** through the GitHub REST API to list repository contents, inspect directory structures, read file contents, generate structured analysis reports, and review pull request diffs.
+This skill helps explore **remote GitHub repositories** through the GitHub REST API to list repository contents, inspect directory structures, read file contents, generate structured analysis reports and review pull request diffs.
+
+## Tooling constraint (hard rule)
+This skill uses **only `curl`, `jq`, `mkdir`, `sort`, `awk`, and standard shell pipes** for all data fetching, parsing, and formatting. Never write a Python script, Node script, or any other scratch program to fetch data, parse JSON, decode base64, or format output — `curl` for HTTP, `jq` for JSON, and shell text tools for formatting cover every action in this skill. If a formatting task seems to need more than that, simplify the output instead of reaching for another language. This applies even when the task looks awkward in pure shell — awkward shell is still preferred over stepping outside the declared tool set.
+
+## No local exploration
+Do not list, browse, or inspect the local project directory (e.g. `ListDir`, `ls`, `find` on the workspace) before acting on a request. This skill's job is entirely remote — everything it needs comes from the GitHub API via `curl`. The only local filesystem interaction this skill ever performs is writing the specific `output/` files Action C or D describes. Go straight from reading the user's request to Step 1 (authenticate).
 
 ## When to Use
 
@@ -21,14 +28,16 @@ This skill helps explore **remote GitHub repositories** through the GitHub REST 
 - Generate a structured analysis report
 - Review a pull request's changes
 
+## Ambiguous requests
+If the user's request doesn't clearly match one action's trigger phrase (e.g. "analyze the repo" could mean Action A's structure listing or Action C's structured analysis), ask which one they mean before proceeding. Do not invent new behavior, fetch additional files beyond what the matched action specifies (e.g. don't independently decide to pull `README.md` or `pom.xml`), or write scratch scripts to figure out what to do.
+
 ## Scope
 Only perform the action the user explicitly asked for, and nothing beyond it:
 - "Show structure" / "explore" / "analyze the structure" means Action A (list tree) only. Do not also fetch individual file contents unless asked.
-- Do not generate summary reports, diagrams, design-pattern write-ups, or any other analysis artifacts unless the user explicitly requests them (see Action C).
+- Do not generate summary reports, diagrams, design-pattern write-ups, or any other analysis artifacts unless the user explicitly requests them (see Action C, D).
 - For Actions A and B, print output directly in the response — do not create scratch scripts, Python helpers, or files. `curl` is the only tool those actions need.
-- Action C is the sole exception to "no files" for analysis: it explicitly requires writing `output/analysis.json` and `output/report.md`. Do not write these unless Action C was explicitly triggered.
-- Action D is the other exception: it explicitly requires writing `output/review.md`. Do not write it unless Action D was explicitly triggered. Action D never posts comments directly to GitHub — output is always the local `review.md` file, never a live API write to the PR.
-- Do not write any files beyond what Actions C and D each specify.
+- Action C and D are the sole exception to "no files": it explicitly requires writing `output/analysis.json` and `output/report.md`, or `output/review.md`. Do not write these unless Action C or D was explicitly triggered.
+- Do not write any files beyond what Action C or D specifies.
 - If you think a follow-up action would be useful (e.g. reading a specific file after listing the tree), ask the user first instead of doing it.
 
 ## Process
@@ -71,7 +80,15 @@ This SKILL.md is the only source of instructions you need. Before doing anything
 **Action A: List Repository Structure**
 * *Trigger:* User asks to show structure, list files, or explore the repo.
 * *API Call:* `GET /repos/{owner}/{repo}/git/trees/{branch}?recursive=1`
-* *Formatting:* Display the directories and files as a readable tree structure in the console. Preserve directory hierarchy and sort directories before files.
+* *Formatting:* pipe the response through `jq` and shell text tools — do not write a script in another language for this:
+  ```bash
+  resp=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/repos/$owner/$repo/git/trees/$branch?recursive=1")
+  echo "$resp" | jq -r '.tree[] | (if .type=="tree" then .path+"/" else .path end)' \
+    | sort \
+    | awk -F/ '{depth=NF-1; name=$NF; if (name=="") {depth=NF-2; name=$(NF-1)"/"}; printf "%*s%s\n", depth*2, "", name}'
+  ```
+  This sorts paths and indents by directory depth. If the output looks off for a particular repo, adjust the `awk` logic directly rather than switching tools.
 * *Stop here.* Do not proceed to Action B or C unless the user separately asks for them.
 
 **Action B: Read File Contents**
@@ -103,30 +120,24 @@ This SKILL.md is the only source of instructions you need. Before doing anything
 * *Parse input:* accept a PR number alone (if owner/repo already established in conversation) or a full PR URL like `https://github.com/owner/repo/pull/3`.
 * *API Call:* `GET /repos/{owner}/{repo}/pulls/{pr_number}/files` — returns each changed file with a `patch` field containing that file's diff. Use this field directly; do not attempt to reconstruct the diff from full file contents.
 * *This is a review, not a changelog.* Do not simply describe what the diff did ("added X", "changed Y to Z") — that's a summary, and summaries aren't reviews. For every changed file, actively evaluate it as a reviewer would: is this change sufficient, or does it fall short? Is there a better approach? What's still wrong even after this diff? A line like "Bug fix: added a turn limit" is a description; "Bug fix: turn limit resolves the infinite loop, but 100 is a hardcoded magic number — consider making it configurable or basing it on character stats" is a review.
-* *Analysis:* for each changed file's patch, look only at lines actually present in the diff, but reviewer commentary can point out things the diff *should have* addressed and didn't. Cover, where relevant:
-    * potential bugs — both introduced by this diff and pre-existing ones left unaddressed in the changed lines
-    * style or architecture concerns — including whether the chosen approach is the best one, not just whether it's consistent
-    * optimization opportunities the diff didn't take
-    * edge cases not handled, even after this change
-    * concrete, actionable improvement suggestions — not just praise
+* *Analysis:* for each changed file's patch, look only at lines actually present in the diff. Cover, where relevant:
+    * potential bugs, edge cases, style issues, and optimization opportunities.
+    * **Code Suggestions (Mandatory):** Whenever you point out a bug, edge case, or structural flaw, you MUST provide the exact code required to fix it. Do not just describe the fix abstractly. Write the corrected code inside a standard Markdown code block, matching the language of the file.
 * *Every file must have at least one forward-looking comment* — a suggestion, open question, or residual concern — even for changes that are otherwise solid. If a file's diff is genuinely flawless with nothing further to suggest, say so explicitly ("no further concerns") rather than silently omitting commentary.
 * *Categorize accurately, don't default everything to one label.* Use the label that matches what actually happened:
-    * **Bug fix** — the diff resolves a genuine defect (e.g. an infinite loop, a null-safety issue, incorrect logic)
-    * **Refactor** — the diff restructures code without changing behavior (e.g. extracting a shared base class, deduplication)
-    * **Style** — the diff is a naming, formatting, or readability-only change with no structural or behavioral impact
-    * **Bug** — a new finding: a defect that still exists in the code after this diff
-    * **Edge case** — a scenario the code doesn't handle correctly, whether introduced or pre-existing
-    * **Suggestion** — a forward-looking improvement idea that isn't a defect, just a better option
-    * When multiple labels could apply to one change (e.g. a fix that's also a simplification), pick the most significant one rather than stacking labels.
+    * **Bug fix** / **Refactor** / **Style** / **Bug** / **Edge case**
+    * **Code Patch** — use this label specifically when providing the actionable code snippet that resolves a identified Bug or Edge case.
 * *Discipline:* ground every comment in lines actually visible in the diff — don't invent claims about code you haven't seen. If a file has no notable findings beyond "this looks fine," say so briefly rather than padding with filler.
-* *Save:* create the `output/` directory if missing (`mkdir -p output`), then write `output/review.md`, one section per changed file:
+* *Save:* create the `output/` directory if missing (`mkdir -p output`), then write `output/review.md`, one section per changed file. Format the output exactly like this:
   ```markdown
-  ## path/to/File.java
-  - **Bug fix:** ...
-  - **Refactor:** ...
-  - **Style:** ...
-  - **Bug:** ...
-  - **Edge case:** ...
+  ## path/to/File.js
+  - **Bug:** The turn limit is a hardcoded magic number which can cause an infinite loop if the state isn't reset.
+  - **Code Patch:** ```javascript
+    // Extract to a configurable constant and add safety boundary
+    const MAX_TURN_LIMIT = process.env.TURN_LIMIT || 100;
+    if (currentTurn >= MAX_TURN_LIMIT) {
+        throw new Error("Turn limit exceeded");
+    }
   ```
 * *Never* post comments to the PR via the GitHub API — this action only produces the local `review.md` file.
 * Confirm to the user the file was written, and show a brief summary inline.
