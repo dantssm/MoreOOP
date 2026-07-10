@@ -1,31 +1,23 @@
-# Repository Analysis Report: MoreOOP
-
 ## Summary
-MoreOOP is a Java-based combat simulation project inspired by Lord of the Rings characters. It is designed as a laboratory assignment for a university object-oriented programming course to demonstrate inheritance, polymorphism, and dynamic class loading using the Reflections library.
+A Lord of the Rings themed Object-Oriented Programming (OOP) combat simulation in Java. It features character types such as Hobbits and Elves, utilizing Java Reflection to dynamically load characters in a combat game manager.
 
 ## Technologies
 - Java 11
 - Maven
-- JUnit Jupiter 5.8.1
-- org.reflections 0.10.2
-- GitHub Actions (CI)
+- JUnit Jupiter
+- Reflections Library
 
 ## Strengths
-- **Good use of OOP principles**: Proper inheritance structure with `Character` base class and polymorphically overridden `kick` methods.
-- **Dynamic character instantiation**: `CharacterFactory` uses the Reflections library to dynamically scan the classpath for character classes, making adding new characters seamless.
-- **Unit Testing**: Contains automated unit tests for classes like `Elf` and `Hobbit` using JUnit 5.
-- **CI Integration**: GitHub Actions workflow (`ci.yaml`) ensures all pushed code is built and tested automatically.
+- Clean usage of inheritance and polymorphism with a base Character class and specific subclasses.
+- Dynamic character discovery and loading using the Reflections library, making it easy to add new character types.
+- Includes basic unit tests for validating character properties and kick logic.
 
 ## Issues
-- **Infinite Loop Hazard**: In `GameManager.fight`, if two `Hobbit` characters fight, they will loop indefinitely crying without dealing any damage.
-- **Encapsulation Violation**: `power` and `hp` fields in `Character` are public, exposing class internals and bypassing getters/setters.
-- **Non-abstract Base Class**: `Character` is not abstract and contains an empty `kick` implementation, allowing generic instantiations.
-- **Reflections Overhead**: Classpath scanning at runtime is heavy and introduces a third-party dependency for a small, static set of character classes.
-- **Insufficient Input Validation**: `setPower` does not validate or reject negative values.
+- Fields `power` and `hp` in `Character` class are public, exposing internals and violating encapsulation.
+- The fight simulation in `GameManager` can run into an infinite loop if two Hobbits fight, as they only cry and do not deal damage.
+- The main `Demo.java` entrypoint is a simple stub printing 'Hello, world!' and does not execute the combat game.
 
 ## Recommendations
-- Make the `Character` class `abstract` and define `kick(Character c)` as an `abstract` method.
-- Encapsulate fields `power` and `hp` by making them `private` or `protected` and accessing them strictly via getters/setters.
-- Introduce a turn-counter limit or draw condition in `GameManager.fight` to prevent infinite loops.
-- Avoid runtime Reflections scanning by using static character registration or a simple factory mapping to remove the third-party dependency.
-- Expand unit test coverage to include `King`, `Knight`, `CharacterFactory`, and `GameManager`.
+- Make `power` and `hp` private or protected in the `Character` class to improve encapsulation.
+- Introduce a maximum turn limit or a stalemate detection check in `GameManager.fight` to prevent infinite loops.
+- Update `Demo.java` to run the combat simulation or remove the redundant entrypoint.
