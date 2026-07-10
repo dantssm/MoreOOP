@@ -3,6 +3,7 @@ name: github-repo-analyzer
 description: Connect to remote GitHub repositories using the GitHub REST API and a locally stored PAT to list repository contents, inspect directory structures, read file contents, or generate structured analysis reports. Use when users ask to explore, browse, inspect, or analyze a GitHub repository without cloning it.
 allowed-tools:
   - Bash(curl:*)
+  - Bash(jq:*)
   - Bash(mkdir:*)
   - Write
 ---
@@ -13,6 +14,12 @@ allowed-tools:
 
 This skill helps explore **remote GitHub repositories** through the GitHub REST API to list repository contents, inspect directory structures, read file contents, and generate structured analysis reports.
 
+## Tooling constraint (hard rule)
+This skill uses **only `curl`, `jq`, `mkdir`, `sort`, `awk`, and standard shell pipes** for all data fetching, parsing, and formatting. Never write a Python script, Node script, or any other scratch program to fetch data, parse JSON, decode base64, or format output — `curl` for HTTP, `jq` for JSON, and shell text tools for formatting cover every action in this skill. If a formatting task seems to need more than that, simplify the output instead of reaching for another language. This applies even when the task looks awkward in pure shell — awkward shell is still preferred over stepping outside the declared tool set.
+
+## No local exploration
+Do not list, browse, or inspect the local project directory (e.g. `ListDir`, `ls`, `find` on the workspace) before acting on a request. This skill's job is entirely remote — everything it needs comes from the GitHub API via `curl`. The only local filesystem interaction this skill ever performs is writing the specific `output/` files Action C describes. Go straight from reading the user's request to Step 1 (authenticate) — do not inspect the workspace first "to understand the project."
+
 ## When to Use
 
 - List repository files
@@ -20,15 +27,26 @@ This skill helps explore **remote GitHub repositories** through the GitHub REST 
 - Read file contents
 - Generate a structured analysis report
 
+## Ambiguous requests
+If the user's request doesn't clearly match one action's trigger phrase (e.g. "analyze the repo" could mean Action A's structure listing or Action C's structured analysis), ask which one they mean before proceeding. Do not invent new behavior, fetch additional files beyond what the matched action specifies (e.g. don't independently decide to pull `README.md` or `pom.xml`), or write scratch scripts to figure out what to do.
+
 ## Scope
 Only perform the action the user explicitly asked for, and nothing beyond it:
 - "Show structure" / "explore" / "analyze the structure" means Action A (list tree) only. Do not also fetch individual file contents unless asked.
 - Do not generate summary reports, diagrams, design-pattern write-ups, or any other analysis artifacts unless the user explicitly requests them (see Action C).
 - For Actions A and B, print output directly in the response — do not create scratch scripts, Python helpers, or files. `curl` is the only tool those actions need.
-- Action C is the sole exception to "no files": it explicitly requires writing `output/analysis.json` and `output/report.md`. Do not write any other files, and do not write these two unless Action C was explicitly triggered.
+- Action C is the sole exception to "no files": it explicitly requires writing `output/analysis.json` and `output/report.md`. Do not write these unless Action C was explicitly triggered.
+- Do not write any files beyond what Action C specifies.
 - If you think a follow-up action would be useful (e.g. reading a specific file after listing the tree), ask the user first instead of doing it.
 
 ## Process
+
+### Step 0: No Detours
+This SKILL.md is the only source of instructions you need. Before doing anything else:
+- Do NOT search for other skills, list your skills directory, or check permissions/tool inventories.
+- Do NOT run `git status`, `git log`, `ls`, or explore the local filesystem beyond reading this file — this skill only talks to `api.github.com`, it has no dependency on local git state.
+- Do NOT ask "where is the skill file" if the user already told you — use the path or reference given.
+- Go straight to Step 1 and start making the API calls the requested action needs.
 
 ### Step 1: Analyze Requirements
 
@@ -61,7 +79,15 @@ Only perform the action the user explicitly asked for, and nothing beyond it:
 **Action A: List Repository Structure**
 * *Trigger:* User asks to show structure, list files, or explore the repo.
 * *API Call:* `GET /repos/{owner}/{repo}/git/trees/{branch}?recursive=1`
-* *Formatting:* Display the directories and files as a readable tree structure in the console. Preserve directory hierarchy and sort directories before files.
+* *Formatting:* pipe the response through `jq` and shell text tools — do not write a script in another language for this:
+  ```bash
+  resp=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/repos/$owner/$repo/git/trees/$branch?recursive=1")
+  echo "$resp" | jq -r '.tree[] | (if .type=="tree" then .path+"/" else .path end)' \
+    | sort \
+    | awk -F/ '{depth=NF-1; name=$NF; if (name=="") {depth=NF-2; name=$(NF-1)"/"}; printf "%*s%s\n", depth*2, "", name}'
+  ```
+  This sorts paths and indents by directory depth. If the output looks off for a particular repo, adjust the `awk` logic directly rather than switching tools.
 * *Stop here.* Do not proceed to Action B or C unless the user separately asks for them.
 
 **Action B: Read File Contents**
