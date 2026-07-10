@@ -102,23 +102,26 @@ This SKILL.md is the only source of instructions you need. Before doing anything
 * *Trigger:* User explicitly asks to review a pull request (e.g. "review PR #3").
 * *Parse input:* accept a PR number alone (if owner/repo already established in conversation) or a full PR URL like `https://github.com/owner/repo/pull/3`.
 * *API Call:* `GET /repos/{owner}/{repo}/pulls/{pr_number}/files` — returns each changed file with a `patch` field containing that file's diff. Use this field directly; do not attempt to reconstruct the diff from full file contents.
-* *Analysis:* for each changed file's patch, look only at lines actually present in the diff and note, where relevant:
-    * potential bugs
-    * style or architecture concerns
-    * optimization opportunities
-    * edge cases not handled
-    * concrete improvement suggestions
+* *This is a review, not a changelog.* Do not simply describe what the diff did ("added X", "changed Y to Z") — that's a summary, and summaries aren't reviews. For every changed file, actively evaluate it as a reviewer would: is this change sufficient, or does it fall short? Is there a better approach? What's still wrong even after this diff? A line like "Bug fix: added a turn limit" is a description; "Bug fix: turn limit resolves the infinite loop, but 100 is a hardcoded magic number — consider making it configurable or basing it on character stats" is a review.
+* *Analysis:* for each changed file's patch, look only at lines actually present in the diff, but reviewer commentary can point out things the diff *should have* addressed and didn't. Cover, where relevant:
+    * potential bugs — both introduced by this diff and pre-existing ones left unaddressed in the changed lines
+    * style or architecture concerns — including whether the chosen approach is the best one, not just whether it's consistent
+    * optimization opportunities the diff didn't take
+    * edge cases not handled, even after this change
+    * concrete, actionable improvement suggestions — not just praise
+* *Every file must have at least one forward-looking comment* — a suggestion, open question, or residual concern — even for changes that are otherwise solid. If a file's diff is genuinely flawless with nothing further to suggest, say so explicitly ("no further concerns") rather than silently omitting commentary.
 * *Categorize accurately, don't default everything to one label.* Use the label that matches what actually happened:
     * **Bug fix** — the diff resolves a genuine defect (e.g. an infinite loop, a null-safety issue, incorrect logic)
     * **Refactor** — the diff restructures code without changing behavior (e.g. extracting a shared base class, deduplication)
     * **Style** — the diff is a naming, formatting, or readability-only change with no structural or behavioral impact
     * **Bug** — a new finding: a defect that still exists in the code after this diff
     * **Edge case** — a scenario the code doesn't handle correctly, whether introduced or pre-existing
+    * **Suggestion** — a forward-looking improvement idea that isn't a defect, just a better option
     * When multiple labels could apply to one change (e.g. a fix that's also a simplification), pick the most significant one rather than stacking labels.
-* *Discipline:* only comment on what's visible in the diff. Do not speculate about unchanged code you haven't seen. If a file has no notable findings, say so briefly rather than omitting it or padding with filler.
+* *Discipline:* ground every comment in lines actually visible in the diff — don't invent claims about code you haven't seen. If a file has no notable findings beyond "this looks fine," say so briefly rather than padding with filler.
 * *Save:* create the `output/` directory if missing (`mkdir -p output`), then write `output/review.md`, one section per changed file:
   ```markdown
-  ## path/to/File
+  ## path/to/File.java
   - **Bug fix:** ...
   - **Refactor:** ...
   - **Style:** ...
